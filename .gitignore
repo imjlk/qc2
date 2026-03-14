@@ -1,0 +1,8 @@
+dist/
+bin/
+_docs/
+*.exe
+*.test
+*.out
+.DS_Store
+

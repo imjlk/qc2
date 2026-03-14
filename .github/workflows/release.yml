@@ -1,0 +1,112 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.1"
+
+      - name: Run tests
+        run: go test ./...
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: qc2
+            goos: darwin
+            goarch: amd64
+          - name: qc2
+            goos: darwin
+            goarch: arm64
+          - name: qc2
+            goos: linux
+            goarch: amd64
+          - name: qc2
+            goos: linux
+            goarch: arm64
+          - name: qc2
+            goos: windows
+            goarch: amd64
+          - name: cpwd
+            goos: darwin
+            goarch: amd64
+          - name: cpwd
+            goos: darwin
+            goarch: arm64
+          - name: cpwd
+            goos: linux
+            goarch: amd64
+          - name: cpwd
+            goos: linux
+            goarch: arm64
+          - name: cpwd
+            goos: windows
+            goarch: amd64
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.1"
+
+      - name: Build archive
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          BIN_NAME: ${{ matrix.name }}
+          VERSION: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -eu
+          VERSION_NO_V="${VERSION#v}"
+          OUTDIR="dist/${BIN_NAME}_${VERSION_NO_V}_${GOOS}_${GOARCH}"
+          mkdir -p "$OUTDIR"
+
+          EXT=""
+          ARCHIVE_EXT="tar.gz"
+          if [ "$GOOS" = "windows" ]; then
+            EXT=".exe"
+            ARCHIVE_EXT="zip"
+          fi
+
+          BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          GOOS="$GOOS" GOARCH="$GOARCH" CGO_ENABLED=0 \
+            go build \
+            -trimpath \
+            -ldflags "-s -w -X github.com/imjlk/qc2/internal/version.Version=${VERSION_NO_V} -X github.com/imjlk/qc2/internal/version.Commit=${COMMIT} -X github.com/imjlk/qc2/internal/version.BuildDate=${BUILD_DATE}" \
+            -o "$OUTDIR/${BIN_NAME}${EXT}" \
+            "./cmd/${BIN_NAME}"
+
+          if [ "$GOOS" = "windows" ]; then
+            (cd dist && zip -rq "${BIN_NAME}_${VERSION_NO_V}_${GOOS}_${GOARCH}.${ARCHIVE_EXT}" "$(basename "$OUTDIR")")
+          else
+            tar -C dist -czf "dist/${BIN_NAME}_${VERSION_NO_V}_${GOOS}_${GOARCH}.${ARCHIVE_EXT}" "$(basename "$OUTDIR")"
+          fi
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.tar.gz
+            dist/*.zip
