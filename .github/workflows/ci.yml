@@ -50,8 +50,12 @@ jobs:
 
       - name: Smoke test commands
         run: |
-          go run ./cmd/cpwd --print
-          go run ./cmd/qc2 cpwd --print
+          standalone="$(go run ./cmd/cpwd --print)"
+          bundled="$(go run ./cmd/qc2 cpwd --print)"
+          if [ "$standalone" != "$bundled" ]; then
+            echo "standalone and bundled cpwd output differ"
+            exit 1
+          fi
 
   windows:
     runs-on: windows-latest
@@ -84,8 +88,8 @@ jobs:
       - name: Smoke test commands
         shell: pwsh
         run: |
-          $standalone = go run ./cmd/cpwd --print
-          $bundled = go run ./cmd/qc2 cpwd --print
+          $standalone = (go run ./cmd/cpwd --print) -join "`n"
+          $bundled = (go run ./cmd/qc2 cpwd --print) -join "`n"
           if ($standalone -ne $bundled) {
               throw "standalone and bundled cpwd output differ"
           }
