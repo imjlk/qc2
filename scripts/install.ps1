@@ -6,6 +6,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
 if ([string]::IsNullOrWhiteSpace($Repo)) {
     $Repo = "imjlk/qc2"
@@ -74,21 +75,24 @@ function Install-Binary {
         [string]$SelectedRepo,
         [string]$Arch,
         [string]$Destination,
-        [string]$TempDir,
+        [string]$DownloadDir,
+        [string]$ExtractDir,
         [string]$ChecksumsPath
     )
 
     $versionValue = $Tag.TrimStart("v")
     $assetName = "{0}_{1}_windows_{2}.zip" -f $Name, $versionValue, $Arch
     $url = "https://github.com/$SelectedRepo/releases/download/$Tag/$assetName"
-    $archivePath = Join-Path $TempDir $assetName
+    $archivePath = Join-Path $DownloadDir $assetName
+    $binaryExtractDir = Join-Path $ExtractDir $Name
 
     Write-Host "installing $Name from $url"
-    Invoke-WebRequest -Uri $url -OutFile $archivePath
+    Invoke-WebRequest -Uri $url -OutFile $archivePath -UseBasicParsing
     Assert-ArchiveChecksum -ArchivePath $archivePath -AssetName $assetName -ChecksumsPath $ChecksumsPath
-    Expand-Archive -Path $archivePath -DestinationPath $TempDir -Force
+    New-Item -ItemType Directory -Path $binaryExtractDir -Force | Out-Null
+    Expand-Archive -Path $archivePath -DestinationPath $binaryExtractDir -Force
 
-    $source = Join-Path $TempDir ("{0}_{1}_windows_{2}\{0}.exe" -f $Name, $versionValue, $Arch)
+    $source = Join-Path $binaryExtractDir ("{0}_{1}_windows_{2}\{0}.exe" -f $Name, $versionValue, $Arch)
     Copy-Item -Path $source -Destination (Join-Path $Destination ("{0}.exe" -f $Name)) -Force
 }
 
@@ -99,17 +103,27 @@ if ([string]::IsNullOrWhiteSpace($tag)) {
 
 $arch = Resolve-Arch
 $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("qc2-" + [System.Guid]::NewGuid().ToString("N"))
+$metadataDir = Join-Path $tempDir "metadata"
+$downloadDir = Join-Path $tempDir "downloads"
+$extractDir = Join-Path $tempDir "extracted"
 New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
-New-Item -ItemType Directory -Path $tempDir | Out-Null
+New-Item -ItemType Directory -Path $metadataDir -Force | Out-Null
+New-Item -ItemType Directory -Path $downloadDir -Force | Out-Null
+New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
 
 try {
-    $checksumsPath = Join-Path $tempDir "SHA256SUMS"
+    $checksumsPath = Join-Path $metadataDir "SHA256SUMS"
     $checksumsUrl = "https://github.com/$Repo/releases/download/$tag/SHA256SUMS"
-    Invoke-WebRequest -Uri $checksumsUrl -OutFile $checksumsPath
+    try {
+        Invoke-WebRequest -Uri $checksumsUrl -OutFile $checksumsPath -UseBasicParsing
+    }
+    catch {
+        throw "failed to download checksums for ${tag}: this release may not include SHA256SUMS"
+    }
 
     foreach ($binary in $Binaries) {
         if (-not [string]::IsNullOrWhiteSpace($binary)) {
-            Install-Binary -Name $binary -Tag $tag -SelectedRepo $Repo -Arch $arch -Destination $InstallDir -TempDir $tempDir -ChecksumsPath $checksumsPath
+            Install-Binary -Name $binary -Tag $tag -SelectedRepo $Repo -Arch $arch -Destination $InstallDir -DownloadDir $downloadDir -ExtractDir $extractDir -ChecksumsPath $checksumsPath
         }
     }
 }

@@ -13,6 +13,14 @@ require_cmd() {
 	fi
 }
 
+require_hash_cmd() {
+	if ! command -v sha256sum >/dev/null 2>&1 \
+		&& ! command -v shasum >/dev/null 2>&1; then
+		echo "missing required command: sha256sum or shasum" >&2
+		exit 1
+	fi
+}
+
 detect_os() {
 	case "$(uname -s)" in
 		Darwin) echo "darwin" ;;
@@ -97,7 +105,10 @@ download_binary() {
 	url="https://github.com/$REPO/releases/download/$tag/$archive_name"
 
 	echo "installing $name from $url"
-	curl -fsSL "$url" -o "$tmpdir/$archive_name"
+	if ! curl -fsSL "$url" -o "$tmpdir/$archive_name"; then
+		echo "failed to download $archive_name" >&2
+		exit 1
+	fi
 	verify_archive "$tmpdir/$archive_name" "$archive_name" "$checksums_path"
 	tar -xzf "$tmpdir/$archive_name" -C "$tmpdir"
 	install -m 0755 "$tmpdir/${name}_${version_value}_${os_name}_${arch_name}/$name" "$INSTALL_DIR/$name"
@@ -108,6 +119,7 @@ require_cmd curl
 require_cmd install
 require_cmd sed
 require_cmd tar
+require_hash_cmd
 
 OS_NAME="$(detect_os)"
 ARCH_NAME="$(detect_arch)"
@@ -124,7 +136,10 @@ trap 'rm -rf "$TMPDIR"' EXIT INT TERM
 
 CHECKSUMS_URL="https://github.com/$REPO/releases/download/$TAG/SHA256SUMS"
 CHECKSUMS_PATH="$TMPDIR/SHA256SUMS"
-curl -fsSL "$CHECKSUMS_URL" -o "$CHECKSUMS_PATH"
+if ! curl -fsSL "$CHECKSUMS_URL" -o "$CHECKSUMS_PATH"; then
+	echo "failed to download checksums for $TAG: this release may not include SHA256SUMS" >&2
+	exit 1
+fi
 
 for name in $BINARIES; do
 	download_binary "$name" "$TAG" "$OS_NAME" "$ARCH_NAME" "$TMPDIR" "$CHECKSUMS_PATH"
@@ -135,4 +150,3 @@ case ":$PATH:" in
 	*":$INSTALL_DIR:"*) ;;
 	*) echo "add $INSTALL_DIR to PATH to run the installed commands" ;;
 esac
-
