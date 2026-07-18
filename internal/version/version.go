@@ -1,5 +1,10 @@
 package version
 
+import (
+	"runtime/debug"
+	"strings"
+)
+
 var (
 	Version   = "dev"
 	Commit    = "none"
@@ -7,5 +12,22 @@ var (
 )
 
 func String() string {
-	return Version
+	if Version != "dev" {
+		return Version
+	}
+
+	buildInfo, ok := debug.ReadBuildInfo()
+	if !ok {
+		return Version
+	}
+
+	return resolve(Version, buildInfo.Main.Version)
+}
+
+func resolve(fallback, moduleVersion string) string {
+	if moduleVersion == "" || moduleVersion == "(devel)" {
+		return fallback
+	}
+
+	return strings.TrimPrefix(moduleVersion, "v")
 }
