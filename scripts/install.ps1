@@ -118,7 +118,7 @@ try {
         Invoke-WebRequest -Uri $checksumsUrl -OutFile $checksumsPath -UseBasicParsing
     }
     catch {
-        throw "failed to download checksums for ${tag}: this release may not include SHA256SUMS"
+        throw "failed to download checksums for ${tag}: $($_.Exception.Message)"
     }
 
     foreach ($binary in $Binaries) {
