@@ -27,8 +27,17 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Test
-        run: go test ./...
+      - name: Check formatting
+        run: |
+          files="$(gofmt -l .)"
+          if [ -n "$files" ]; then
+            echo "the following files need gofmt:"
+            echo "$files"
+            exit 1
+          fi
+
+      - name: Test with race detector
+        run: go test -race ./...
 
       - name: Vet
         run: go vet ./...
@@ -36,3 +45,47 @@ jobs:
       - name: Build
         run: go build ./...
 
+      - name: Check installer syntax
+        run: sh -n scripts/install.sh
+
+      - name: Smoke test commands
+        run: |
+          go run ./cmd/cpwd --print
+          go run ./cmd/qc2 cpwd --print
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Test Go on Windows
+        run: go test ./...
+
+      - name: Build installer fixture
+        shell: pwsh
+        run: go build -o "$env:RUNNER_TEMP\qc2.exe" ./cmd/qc2
+
+      - name: Test installer with Windows PowerShell
+        shell: powershell
+        run: .\scripts\install.tests.ps1 -FixtureBinary "$env:RUNNER_TEMP\qc2.exe"
+
+      - name: Test installer with PowerShell 7
+        shell: pwsh
+        run: .\scripts\install.tests.ps1 -FixtureBinary "$env:RUNNER_TEMP\qc2.exe"
+
+      - name: Smoke test commands
+        shell: pwsh
+        run: |
+          $standalone = go run ./cmd/cpwd --print
+          $bundled = go run ./cmd/qc2 cpwd --print
+          if ($standalone -ne $bundled) {
+              throw "standalone and bundled cpwd output differ"
+          }
