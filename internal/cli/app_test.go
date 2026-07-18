@@ -17,6 +17,7 @@ func TestAppRunListIncludesRegisteredAndBuiltinCommands(t *testing.T) {
 	if err := app.Register(Command{
 		Name:    "cpwd",
 		Summary: "Copy the current working directory to the clipboard.",
+		Usage:   "cpwd usage\n",
 		Run: func(context.Context, []string) error {
 			return nil
 		},
@@ -44,6 +45,7 @@ func TestAppRunDispatchesRegisteredCommand(t *testing.T) {
 	if err := app.Register(Command{
 		Name:    "echo",
 		Summary: "Echo test args.",
+		Usage:   "echo usage\n",
 		Run: func(_ context.Context, args []string) error {
 			gotArgs = append([]string(nil), args...)
 			return nil
@@ -94,6 +96,7 @@ func TestAppRegisterRejectsDuplicates(t *testing.T) {
 	command := Command{
 		Name:    "cpwd",
 		Summary: "Copy the current working directory to the clipboard.",
+		Usage:   "cpwd usage\n",
 		Run: func(context.Context, []string) error {
 			return nil
 		},
@@ -116,9 +119,7 @@ func TestAppRunHelpForCommand(t *testing.T) {
 	if err := app.Register(Command{
 		Name:    "cpwd",
 		Summary: "Copy the current working directory to the clipboard.",
-		Help: func(w io.Writer) {
-			_, _ = w.Write([]byte("cpwd help\n"))
-		},
+		Usage:   "cpwd help\n",
 		Run: func(context.Context, []string) error {
 			return errors.New("should not run")
 		},
@@ -133,4 +134,24 @@ func TestAppRunHelpForCommand(t *testing.T) {
 	if stdout.String() != "cpwd help\n" {
 		t.Fatalf("help output = %q, want %q", stdout.String(), "cpwd help\n")
 	}
+}
+
+func TestAppRunReturnsOutputError(t *testing.T) {
+	t.Parallel()
+
+	wantErr := errors.New("write failed")
+	app := NewApp("qc2", "Small CLI utilities for everyday workflows.", "dev", errorWriter{err: wantErr})
+
+	err := app.Run(context.Background(), []string{"version"})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Run error = %v, want %v", err, wantErr)
+	}
+}
+
+type errorWriter struct {
+	err error
+}
+
+func (w errorWriter) Write([]byte) (int, error) {
+	return 0, w.err
 }

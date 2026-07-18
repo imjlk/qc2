@@ -14,8 +14,27 @@ The project starts with one Go module and a monorepo-style layout:
 - `cmd/qc2` holds the bundled CLI so users can run `qc2 <command>`.
 - `internal/commands/<name>` holds the reusable command logic shared by both entry points.
 - `internal/cli` holds the small command registry and built-in help/list/version behavior for the bundled CLI.
+- `internal/qc2app` composes the bundled CLI by registering the available commands.
 
 That keeps the first version simple while leaving room to add more utilities like `p2url`, `abspath`, or `mkcd` later.
+
+## Project Structure
+
+```text
+cmd/
+  cpwd/                 standalone cpwd entry point
+  qc2/                  bundled qc2 entry point
+internal/
+  cli/                  shared command registry and dispatcher
+  clip/                 operating-system clipboard backends
+  commands/cpwd/        cpwd flags and reusable behavior
+  pathutil/             path and file URL helpers
+  qc2app/               bundled command composition
+  version/              build-time version information
+scripts/                release installers
+```
+
+The dependency direction is intentional: command packages do not import the bundled CLI. `internal/qc2app` is the composition root that connects commands to `internal/cli`.
 
 ## Commands
 
@@ -86,6 +105,12 @@ Run tests:
 go test ./...
 ```
 
+Run static checks:
+
+```bash
+go vet ./...
+```
+
 Build everything:
 
 ```bash
@@ -127,8 +152,8 @@ They are structured around GitHub release assets and can install one or more bin
 
 ## Adding a New Command
 
-1. Add reusable logic under `internal/commands/<name>`.
+1. Add reusable flags and behavior under `internal/commands/<name>`.
 2. Add a standalone entry point at `cmd/<name>/main.go`.
-3. Expose `NewCommand(...)` from `internal/commands/<name>` and register it in `cmd/qc2/main.go`.
-4. Add tests for the internal command package.
+3. Register the command in `internal/qc2app/app.go`.
+4. Add unit tests for the command and an integration check for registration.
 5. Update the README, release workflow, and installer defaults if the new command should ship as a standalone binary.
