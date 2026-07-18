@@ -47,7 +47,7 @@ go install github.com/imjlk/qc2/cmd/qc2@latest
 go install github.com/imjlk/qc2/cmd/cpwd@latest
 ```
 
-You can also download an archive directly from [GitHub Releases](https://github.com/imjlk/qc2/releases).
+You can also download an archive from [GitHub Releases](https://github.com/imjlk/qc2/releases) and verify it against the published `SHA256SUMS` file.
 
 ## Usage
 
@@ -137,7 +137,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) to add a command or submit a change.
 
 ## Release model
 
-Version tags such as `v0.1.0` trigger builds for macOS, Linux, and Windows. GitHub Releases receives the prebuilt archives. Until `v1.0.0`, minor versions may contain breaking changes.
+Version tags such as `v0.1.0` trigger builds for macOS, Linux, and Windows on both AMD64 and ARM64. GitHub Releases receives the prebuilt archives, generated release notes, and `SHA256SUMS`. Until `v1.0.0`, minor versions may contain breaking changes.
 
 ## License
 

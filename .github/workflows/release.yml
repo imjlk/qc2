@@ -4,109 +4,130 @@ on:
   push:
     tags:
       - "v*"
-  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  test:
+  verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
-          go-version: "1.26.1"
+          go-version-file: go.mod
+          cache: true
 
-      - name: Run tests
-        run: go test ./...
+      - name: Verify source
+        run: |
+          go test ./...
+          go vet ./...
+          go build ./...
 
-  release:
-    needs: test
+  build:
+    needs: verify
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: qc2
-            goos: darwin
+          - goos: darwin
             goarch: amd64
-          - name: qc2
-            goos: darwin
+          - goos: darwin
             goarch: arm64
-          - name: qc2
-            goos: linux
+          - goos: linux
             goarch: amd64
-          - name: qc2
-            goos: linux
+          - goos: linux
             goarch: arm64
-          - name: qc2
-            goos: windows
+          - goos: windows
             goarch: amd64
-          - name: cpwd
-            goos: darwin
-            goarch: amd64
-          - name: cpwd
-            goos: darwin
+          - goos: windows
             goarch: arm64
-          - name: cpwd
-            goos: linux
-            goarch: amd64
-          - name: cpwd
-            goos: linux
-            goarch: arm64
-          - name: cpwd
-            goos: windows
-            goarch: amd64
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
-          go-version: "1.26.1"
+          go-version-file: go.mod
+          cache: true
 
-      - name: Build archive
+      - name: Build archives
         env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-          BIN_NAME: ${{ matrix.name }}
-          VERSION: ${{ github.ref_name }}
+          TARGET_OS: ${{ matrix.goos }}
+          TARGET_ARCH: ${{ matrix.goarch }}
+          VERSION_TAG: ${{ github.ref_name }}
           COMMIT: ${{ github.sha }}
         run: |
           set -eu
-          VERSION_NO_V="${VERSION#v}"
-          OUTDIR="dist/${BIN_NAME}_${VERSION_NO_V}_${GOOS}_${GOARCH}"
-          mkdir -p "$OUTDIR"
 
-          EXT=""
-          ARCHIVE_EXT="tar.gz"
-          if [ "$GOOS" = "windows" ]; then
-            EXT=".exe"
-            ARCHIVE_EXT="zip"
-          fi
-
+          VERSION="${VERSION_TAG#v}"
           BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          GOOS="$GOOS" GOARCH="$GOARCH" CGO_ENABLED=0 \
-            go build \
-            -trimpath \
-            -ldflags "-s -w -X github.com/imjlk/qc2/internal/version.Version=${VERSION_NO_V} -X github.com/imjlk/qc2/internal/version.Commit=${COMMIT} -X github.com/imjlk/qc2/internal/version.BuildDate=${BUILD_DATE}" \
-            -o "$OUTDIR/${BIN_NAME}${EXT}" \
-            "./cmd/${BIN_NAME}"
+          mkdir -p dist
 
-          if [ "$GOOS" = "windows" ]; then
-            (cd dist && zip -rq "${BIN_NAME}_${VERSION_NO_V}_${GOOS}_${GOARCH}.${ARCHIVE_EXT}" "$(basename "$OUTDIR")")
-          else
-            tar -C dist -czf "dist/${BIN_NAME}_${VERSION_NO_V}_${GOOS}_${GOARCH}.${ARCHIVE_EXT}" "$(basename "$OUTDIR")"
-          fi
+          for BIN_NAME in qc2 cpwd; do
+            ARCHIVE_BASE="${BIN_NAME}_${VERSION}_${TARGET_OS}_${TARGET_ARCH}"
+            OUTDIR="dist/${ARCHIVE_BASE}"
+            EXT=""
+            mkdir -p "$OUTDIR"
 
-      - name: Upload release asset
+            if [ "$TARGET_OS" = "windows" ]; then
+              EXT=".exe"
+            fi
+
+            CGO_ENABLED=0 GOOS="$TARGET_OS" GOARCH="$TARGET_ARCH" \
+              go build \
+              -trimpath \
+              -ldflags "-s -w -X github.com/imjlk/qc2/internal/version.Version=${VERSION} -X github.com/imjlk/qc2/internal/version.Commit=${COMMIT} -X github.com/imjlk/qc2/internal/version.BuildDate=${BUILD_DATE}" \
+              -o "$OUTDIR/${BIN_NAME}${EXT}" \
+              "./cmd/${BIN_NAME}"
+
+            cp LICENSE README.md "$OUTDIR/"
+
+            if [ "$TARGET_OS" = "windows" ]; then
+              (cd dist && zip -qr "${ARCHIVE_BASE}.zip" "$ARCHIVE_BASE")
+            else
+              tar -C dist -czf "dist/${ARCHIVE_BASE}.tar.gz" "$ARCHIVE_BASE"
+            fi
+          done
+
+      - name: Upload archives
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download archives
+        uses: actions/download-artifact@v5
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum *.tar.gz *.zip > SHA256SUMS
+
+      - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
+          generate_release_notes: true
           files: |
             dist/*.tar.gz
             dist/*.zip
+            dist/SHA256SUMS
