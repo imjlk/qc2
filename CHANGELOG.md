@@ -6,6 +6,8 @@ The project follows [Semantic Versioning](https://semver.org/). Until `v1.0.0`, 
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-07-19
+
 ### Added
 
 - Standalone `cpwd` binary and bundled `qc2 cpwd` command.
@@ -13,3 +15,6 @@ The project follows [Semantic Versioning](https://semver.org/). Until `v1.0.0`, 
 - Cross-platform clipboard support for macOS, Windows, and Linux.
 - Prebuilt release workflow with SHA-256 checksums.
 - Installation scripts that verify downloaded release archives.
+
+[Unreleased]: https://github.com/imjlk/qc2/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/imjlk/qc2/releases/tag/v0.1.0
