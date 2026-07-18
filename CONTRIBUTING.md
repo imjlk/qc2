@@ -2,6 +2,8 @@
 
 Thanks for helping improve qc2.
 
+Participation in this project is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## Development setup
 
 The repository uses Go `1.26.1`.
@@ -38,4 +40,3 @@ Command packages should not import `internal/cli`; `internal/qc2app` owns that i
 - Add tests for behavior changes and bug fixes.
 - Run `go test ./...`, `go vet ./...`, and `go build ./...` before opening the pull request.
 - Update the changelog when the change affects users.
-
