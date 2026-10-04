@@ -48,6 +48,12 @@ jobs:
       - name: Check installer syntax
         run: sh -n scripts/install.sh
 
+      - name: Test installer functions
+        run: sh scripts/install_test.sh
+
+      - name: Test release archive smoke script
+        run: sh scripts/smoke_archives_test.sh
+
       - name: Smoke test commands
         run: |
           standalone="$(go run ./cmd/cpwd --print)"
@@ -84,6 +90,10 @@ jobs:
       - name: Test installer with PowerShell 7
         shell: pwsh
         run: .\scripts\install.tests.ps1 -FixtureBinary "$env:RUNNER_TEMP\qc2.exe"
+
+      - name: Test release archive smoke script
+        shell: bash
+        run: sh scripts/smoke_archives_test.sh
 
       - name: Smoke test commands
         shell: pwsh
