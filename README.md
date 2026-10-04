@@ -60,6 +60,8 @@ qc2 help       Show general or command-specific help.
 qc2 version    Show the installed version.
 ```
 
+Release builds also print the commit and build time from `qc2 version`.
+
 The same `cpwd` implementation is available as a standalone binary:
 
 ```bash

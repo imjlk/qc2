@@ -15,7 +15,7 @@ const (
 )
 
 func New(stdout io.Writer) (*cli.App, error) {
-	app := cli.NewApp(Name, Tagline, version.String(), stdout)
+	app := cli.NewApp(Name, Tagline, version.Report(), stdout)
 	deps := cpwd.DefaultDependencies(stdout)
 
 	err := app.Register(cli.Command{
