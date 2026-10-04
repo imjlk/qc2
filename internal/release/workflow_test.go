@@ -44,4 +44,10 @@ func TestReleaseWorkflowShipsCmdDirectories(t *testing.T) {
 	if !strings.Contains(prepareText, "gh workflow run release.yml --ref") {
 		t.Fatal("release prepare should start the release workflow for the new tag")
 	}
+	if !strings.Contains(prepareText, "secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN") {
+		t.Fatal("release prepare should prefer a maintainer token when one is configured")
+	}
+	if !strings.Contains(prepareText, "if [ -z \"${RELEASE_TOKEN:-}\" ]; then") {
+		t.Fatal("release prepare should dispatch the release workflow only for the default token")
+	}
 }
