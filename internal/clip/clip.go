@@ -69,6 +69,9 @@ func copyExec(ctx context.Context, goos string, text string, lookupPath func(str
 		}
 		last = err
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	return last
 }
 

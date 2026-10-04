@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestResolveBackendPrefersFirstAvailableLinuxBackend(t *testing.T) {
@@ -183,6 +184,52 @@ func TestCopyExecStopsAfterCanceledContext(t *testing.T) {
 	}
 }
 
+func TestCopyExecReturnsCanceledContextFromLastBackend(t *testing.T) {
+	t.Parallel()
+
+	ready := filepath.Join(t.TempDir(), "ready")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	lookupPath := func(name string) (string, error) {
+		if name == "xsel" {
+			return "/usr/bin/xsel", nil
+		}
+		return "", os.ErrNotExist
+	}
+	commandContext := func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestClipboardHelper$")
+		cmd.Env = append(os.Environ(), "QC2_CLIP_HELPER=block", "QC2_CLIP_READY="+ready)
+		return cmd
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		done <- copyExec(ctx, "linux", "qc2", lookupPath, commandContext)
+	}()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		if _, err := os.Stat(ready); err == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("clipboard helper did not start")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	cancel()
+
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("copyExec() error = %v, want context.Canceled", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("copyExec() did not return after cancel")
+	}
+}
+
 func TestClipboardHelper(t *testing.T) {
 	mode := os.Getenv("QC2_CLIP_HELPER")
 	if mode == "" {
@@ -193,6 +240,16 @@ func TestClipboardHelper(t *testing.T) {
 	if err != nil {
 		os.Stderr.WriteString(err.Error())
 		os.Exit(1)
+	}
+	if mode == "block" {
+		os.Stderr.WriteString("backend failed")
+		if path := os.Getenv("QC2_CLIP_READY"); path != "" {
+			if err := os.WriteFile(path, []byte("ready"), 0o600); err != nil {
+				os.Stderr.WriteString(err.Error())
+				os.Exit(1)
+			}
+		}
+		time.Sleep(time.Hour)
 	}
 	if mode == "fail" {
 		os.Stderr.WriteString("backend failed")
