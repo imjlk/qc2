@@ -16,5 +16,6 @@ show_acknowledgments = true
 
 [packages]
 # qc2 is a Go module. Sampo has no Go adapter, so changesets name the CLI
-# without an ecosystem prefix. Do not invent an npm or Cargo package id.
+# without an ecosystem prefix. scripts/prepare-release.go consumes them into
+# CHANGELOG.md. Do not invent an npm or Cargo package id.
 ignore_unpublished = false

@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v7
@@ -44,6 +46,12 @@ jobs:
 
       - name: Build
         run: go build ./...
+
+      - name: Require a changeset for user-facing changes
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          go run ./scripts/prepare-release.go check --base "origin/${{ github.base_ref }}"
 
       - name: Check installer syntax
         run: sh -n scripts/install.sh
