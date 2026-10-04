@@ -93,7 +93,7 @@ Clipboard backends:
 
 - macOS: `pbcopy`
 - Windows: the system clipboard, written as Unicode text
-- Linux: the first available of `wl-copy`, `xclip`, or `xsel`
+- Linux: the first of `wl-copy`, `xclip`, or `xsel` that accepts the copy
 
 When no Linux backend is available, use `--print` or install one of the listed tools.
 
