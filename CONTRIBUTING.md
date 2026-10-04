@@ -29,7 +29,7 @@ go run ./cmd/qc2 cpwd --print
 2. Add the standalone entry point in `cmd/<name>/main.go`.
 3. Register it in `internal/qc2app/app.go`.
 4. Add unit tests and a registration test.
-5. Add the binary to the release matrix if it should ship independently.
+5. The release workflow ships every directory in `cmd/`. A standalone entry point there is included automatically.
 6. Document the command in `README.md` and `CHANGELOG.md`.
 
 Command packages should not import `internal/cli`; `internal/qc2app` owns that integration.

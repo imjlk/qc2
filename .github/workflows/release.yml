@@ -75,7 +75,12 @@ jobs:
           BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           mkdir -p dist
 
-          for BIN_NAME in qc2 cpwd; do
+          # Ship every standalone entry point under cmd/.
+          for bin_path in cmd/*; do
+            if [ ! -d "$bin_path" ]; then
+              continue
+            fi
+            BIN_NAME=${bin_path#cmd/}
             ARCHIVE_BASE="${BIN_NAME}_${VERSION}_${TARGET_OS}_${TARGET_ARCH}"
             OUTDIR="dist/${ARCHIVE_BASE}"
             EXT=""
@@ -111,8 +116,56 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  publish:
+  smoke:
     needs: build
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            goos: linux
+          - runner: macos-latest
+            goos: darwin
+          - runner: windows-latest
+            goos: windows
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7
+
+      - name: Detect architecture
+        id: arch
+        shell: bash
+        run: |
+          set -eu
+          case "$(uname -m)" in
+            x86_64|amd64) arch=amd64 ;;
+            arm64|aarch64) arch=arm64 ;;
+            *)
+              echo "unsupported architecture: $(uname -m)" >&2
+              exit 1
+              ;;
+          esac
+          echo "arch=$arch" >> "$GITHUB_OUTPUT"
+
+      - name: Download archives
+        uses: actions/download-artifact@v8
+        with:
+          name: release-${{ matrix.goos }}-${{ steps.arch.outputs.arch }}
+          path: dist
+
+      - name: Smoke test archives
+        shell: bash
+        env:
+          VERSION_TAG: ${{ github.ref_name }}
+        run: |
+          set -eu
+          version="${VERSION_TAG#v}"
+          sh scripts/smoke-archives.sh dist "$version" "${{ matrix.goos }}" "${{ steps.arch.outputs.arch }}"
+
+  publish:
+    needs: smoke
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

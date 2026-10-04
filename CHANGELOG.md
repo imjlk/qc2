@@ -10,6 +10,10 @@ The project follows [Semantic Versioning](https://semver.org/). Until `v1.0.0`, 
 
 - `qc2 version` prints the commit and build time for release binaries.
 
+### Fixed
+
+- Copy non-ASCII text on Windows through the Unicode clipboard instead of `clip.exe`.
+
 ## [0.1.1] - 2026-07-19
 
 ### Fixed

@@ -21,26 +21,34 @@ require_hash_cmd() {
 	fi
 }
 
-detect_os() {
-	case "$(uname -s)" in
+os_from_uname() {
+	case "$1" in
 		Darwin) echo "darwin" ;;
 		Linux) echo "linux" ;;
 		*)
 			echo "unsupported operating system" >&2
-			exit 1
+			return 1
 			;;
 	esac
 }
 
-detect_arch() {
-	case "$(uname -m)" in
+arch_from_uname() {
+	case "$1" in
 		x86_64|amd64) echo "amd64" ;;
 		arm64|aarch64) echo "arm64" ;;
 		*)
 			echo "unsupported architecture" >&2
-			exit 1
+			return 1
 			;;
 	esac
+}
+
+detect_os() {
+	os_from_uname "$(uname -s)" || exit 1
+}
+
+detect_arch() {
+	arch_from_uname "$(uname -m)" || exit 1
 }
 
 resolve_tag() {
@@ -114,39 +122,45 @@ download_binary() {
 	install -m 0755 "$tmpdir/${name}_${version_value}_${os_name}_${arch_name}/$name" "$INSTALL_DIR/$name"
 }
 
-require_cmd awk
-require_cmd curl
-require_cmd install
-require_cmd sed
-require_cmd tar
-require_hash_cmd
+main() {
+	require_cmd awk
+	require_cmd curl
+	require_cmd install
+	require_cmd sed
+	require_cmd tar
+	require_hash_cmd
 
-OS_NAME="$(detect_os)"
-ARCH_NAME="$(detect_arch)"
-TAG="$(resolve_tag)"
+	OS_NAME="$(detect_os)"
+	ARCH_NAME="$(detect_arch)"
+	TAG="$(resolve_tag)"
 
-if [ -z "$TAG" ]; then
-	echo "could not resolve a release tag from GitHub" >&2
-	exit 1
+	if [ -z "$TAG" ]; then
+		echo "could not resolve a release tag from GitHub" >&2
+		exit 1
+	fi
+
+	mkdir -p "$INSTALL_DIR"
+	TMPDIR="$(mktemp -d)"
+	trap 'rm -rf "$TMPDIR"' EXIT INT TERM
+
+	CHECKSUMS_URL="https://github.com/$REPO/releases/download/$TAG/SHA256SUMS"
+	CHECKSUMS_PATH="$TMPDIR/SHA256SUMS"
+	if ! curl -fsSL "$CHECKSUMS_URL" -o "$CHECKSUMS_PATH"; then
+		echo "failed to download checksums for $TAG: this release may not include SHA256SUMS" >&2
+		exit 1
+	fi
+
+	for name in $BINARIES; do
+		download_binary "$name" "$TAG" "$OS_NAME" "$ARCH_NAME" "$TMPDIR" "$CHECKSUMS_PATH"
+	done
+
+	echo "installed to $INSTALL_DIR"
+	case ":$PATH:" in
+		*":$INSTALL_DIR:"*) ;;
+		*) echo "add $INSTALL_DIR to PATH to run the installed commands" ;;
+	esac
+}
+
+if [ "${QC2_INSTALL_SOURCE_ONLY:-}" != "1" ]; then
+	main
 fi
-
-mkdir -p "$INSTALL_DIR"
-TMPDIR="$(mktemp -d)"
-trap 'rm -rf "$TMPDIR"' EXIT INT TERM
-
-CHECKSUMS_URL="https://github.com/$REPO/releases/download/$TAG/SHA256SUMS"
-CHECKSUMS_PATH="$TMPDIR/SHA256SUMS"
-if ! curl -fsSL "$CHECKSUMS_URL" -o "$CHECKSUMS_PATH"; then
-	echo "failed to download checksums for $TAG: this release may not include SHA256SUMS" >&2
-	exit 1
-fi
-
-for name in $BINARIES; do
-	download_binary "$name" "$TAG" "$OS_NAME" "$ARCH_NAME" "$TMPDIR" "$CHECKSUMS_PATH"
-done
-
-echo "installed to $INSTALL_DIR"
-case ":$PATH:" in
-	*":$INSTALL_DIR:"*) ;;
-	*) echo "add $INSTALL_DIR to PATH to run the installed commands" ;;
-esac

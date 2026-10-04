@@ -92,10 +92,10 @@ qc2 cpwd -f -p        # print a file:// URL without copying
 Clipboard backends:
 
 - macOS: `pbcopy`
-- Windows: `clip`
+- Windows: the system clipboard, written as Unicode text
 - Linux: the first available of `wl-copy`, `xclip`, or `xsel`
 
-When no backend is available, use `--print` or install one of the listed Linux tools.
+When no Linux backend is available, use `--print` or install one of the listed tools.
 
 ## Uninstall
 
