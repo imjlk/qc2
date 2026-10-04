@@ -9,6 +9,7 @@ The project follows [Semantic Versioning](https://semver.org/). Until `v1.0.0`, 
 ### Fixed
 
 - Copy non-ASCII text on Windows through the Unicode clipboard instead of `clip.exe`.
+- Try the next Linux clipboard program when an earlier one fails to copy.
 
 ## [0.1.1] - 2026-07-19
 

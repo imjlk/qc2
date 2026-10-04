@@ -53,11 +53,23 @@ func (c SystemClipboard) Copy(ctx context.Context, text string) error {
 }
 
 func copyExec(ctx context.Context, goos string, text string, lookupPath func(string) (string, error), commandContext func(context.Context, string, ...string) *exec.Cmd) error {
-	selected, err := resolveBackend(goos, lookupPath)
+	available, err := availableBackends(goos, lookupPath)
 	if err != nil {
 		return err
 	}
-	return runClipboardCommand(ctx, commandContext, selected, text)
+
+	var last error
+	for _, selected := range available {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		err := runClipboardCommand(ctx, commandContext, selected, text)
+		if err == nil {
+			return nil
+		}
+		last = err
+	}
+	return last
 }
 
 func runClipboardCommand(ctx context.Context, commandContext func(context.Context, string, ...string) *exec.Cmd, selected backend, text string) error {
@@ -77,26 +89,31 @@ func runClipboardCommand(ctx context.Context, commandContext func(context.Contex
 }
 
 func resolveBackend(goos string, lookupPath func(string) (string, error)) (backend, error) {
+	available, err := availableBackends(goos, lookupPath)
+	if err != nil {
+		return backend{}, err
+	}
+	return available[0], nil
+}
+
+func availableBackends(goos string, lookupPath func(string) (string, error)) ([]backend, error) {
 	candidates := backendsFor(goos)
 	if len(candidates) == 0 {
-		return backend{}, &UnavailableError{GOOS: goos}
+		return nil, &UnavailableError{GOOS: goos}
 	}
 
-	for _, candidate := range candidates {
-		if _, err := lookupPath(candidate.name); err == nil {
-			return candidate, nil
-		}
-	}
-
+	available := make([]backend, 0, len(candidates))
 	names := make([]string, 0, len(candidates))
 	for _, candidate := range candidates {
 		names = append(names, candidate.name)
+		if _, err := lookupPath(candidate.name); err == nil {
+			available = append(available, candidate)
+		}
 	}
-
-	return backend{}, &UnavailableError{
-		GOOS:       goos,
-		Candidates: names,
+	if len(available) == 0 {
+		return nil, &UnavailableError{GOOS: goos, Candidates: names}
 	}
+	return available, nil
 }
 
 func backendsFor(goos string) []backend {
