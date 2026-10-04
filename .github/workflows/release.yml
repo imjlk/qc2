@@ -75,7 +75,12 @@ jobs:
           BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           mkdir -p dist
 
-          for BIN_NAME in qc2 cpwd; do
+          # Ship every standalone entry point under cmd/.
+          for bin_path in cmd/*; do
+            if [ ! -d "$bin_path" ]; then
+              continue
+            fi
+            BIN_NAME=${bin_path#cmd/}
             ARCHIVE_BASE="${BIN_NAME}_${VERSION}_${TARGET_OS}_${TARGET_ARCH}"
             OUTDIR="dist/${ARCHIVE_BASE}"
             EXT=""
