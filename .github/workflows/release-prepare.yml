@@ -1,0 +1,94 @@
+name: release prepare
+
+on:
+  workflow_run:
+    workflows:
+      - ci
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-prepare
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == github.repository
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Open a release pull request or tag the merged release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          current="$(git describe --tags --abbrev=0)"
+          current="${current#v}"
+          shopt -s nullglob
+          changesets=(.sampo/changesets/*.md)
+
+          if [ "${#changesets[@]}" -eq 0 ]; then
+            version="$(go run ./scripts/prepare-release.go latest)"
+            tag="v${version}"
+            if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+              echo "${tag} already exists"
+              exit 0
+            fi
+            git tag "$tag"
+            git push origin "$tag"
+            # A tag pushed with GITHUB_TOKEN does not start the tag workflow.
+            gh workflow run release.yml --ref "$tag"
+            exit 0
+          fi
+
+          version="$(go run ./scripts/prepare-release.go apply --current "$current" --date "$(date -u +%Y-%m-%d)")"
+          branch="release/v${version}"
+          git checkout -B "$branch"
+          git add -A CHANGELOG.md .sampo/changesets
+          git commit -m "chore(release): v${version}"
+
+          if git ls-remote --exit-code origin "refs/heads/${branch}" >/dev/null 2>&1; then
+            # The release branch only contains this generated commit.
+            git push --force-with-lease origin "$branch"
+          else
+            git push -u origin "$branch"
+          fi
+
+          notes="$(go run ./scripts/prepare-release.go notes --version "$version")"
+          body="$(jq -nr --arg version "$version" --arg notes "$notes" \
+            '"Merging this pull request publishes qc2 \($version).\n\nAfter CI passes on main, the release prepare workflow tags `v\($version)` and the release workflow uploads the binaries. These changelog notes become the GitHub release body.\n\n\($notes)"')"
+          existing="$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --head "$branch" --json number --jq '.[0].number')"
+          if [ -n "$existing" ]; then
+            gh pr edit "$existing" --repo "$GITHUB_REPOSITORY" --title "chore(release): v${version}" --body "$body"
+          else
+            gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$branch" --title "chore(release): v${version}" --body "$body"
+          fi

@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -171,6 +172,27 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Check out code
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Write release notes
+        run: |
+          set -eu
+          case "$GITHUB_REF" in
+            refs/tags/v*) ;;
+            *)
+              echo "release workflow must run on a v* tag" >&2
+              exit 1
+              ;;
+          esac
+          go run ./scripts/prepare-release.go notes --version "${GITHUB_REF_NAME#v}" > release-notes.md
+
       - name: Download archives
         uses: actions/download-artifact@v8
         with:
@@ -185,7 +207,7 @@ jobs:
       - name: Publish GitHub release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
-          generate_release_notes: true
+          body_path: release-notes.md
           files: |
             dist/*.tar.gz
             dist/*.zip
