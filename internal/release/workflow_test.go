@@ -15,7 +15,7 @@ func TestReleaseWorkflowShipsCmdDirectories(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read release workflow: %v", err)
 	}
-	text := string(workflow)
+	text := strings.ReplaceAll(string(workflow), "\r\n", "\n")
 	if strings.Contains(text, "for BIN_NAME in") {
 		t.Fatal("release workflow hardcodes binary names")
 	}
@@ -34,7 +34,7 @@ func TestReleaseWorkflowShipsCmdDirectories(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read release prepare workflow: %v", err)
 	}
-	prepareText := string(prepare)
+	prepareText := strings.ReplaceAll(string(prepare), "\r\n", "\n")
 	if !strings.Contains(prepareText, "workflows:\n      - ci") {
 		t.Fatal("release prepare should run after ci on main")
 	}

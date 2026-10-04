@@ -167,9 +167,9 @@ func loadChangesets(root string) ([]releaseprep.Entry, error) {
 
 func gitDiff(base, filter string) ([]string, error) {
 	cmd := exec.Command("git", "diff", "--name-only", "--diff-filter="+filter, base+"...HEAD")
-	out, err := cmd.Output()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("git diff %s: %w", base, err)
+		return nil, fmt.Errorf("git diff %s: %w\n%s", base, err, out)
 	}
 	text := strings.TrimSpace(string(out))
 	if text == "" {
