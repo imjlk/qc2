@@ -36,6 +36,9 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          # A maintainer token opens the release pull request as that user, so CI starts
+          # without the approval prompt GitHub shows for GITHUB_TOKEN.
+          token: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Set up Go
         uses: actions/setup-go@v7
@@ -45,7 +48,8 @@ jobs:
 
       - name: Open a release pull request or tag the merged release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -66,7 +70,10 @@ jobs:
             git tag "$tag"
             git push origin "$tag"
             # A tag pushed with GITHUB_TOKEN does not start the tag workflow.
-            gh workflow run release.yml --ref "$tag"
+            # A RELEASE_TOKEN push does, so dispatch only for the default token.
+            if [ -z "${RELEASE_TOKEN:-}" ]; then
+              gh workflow run release.yml --ref "$tag"
+            fi
             exit 0
           fi
 
@@ -84,8 +91,12 @@ jobs:
           fi
 
           notes="$(go run ./scripts/prepare-release.go notes --version "$version")"
-          body="$(jq -nr --arg version "$version" --arg notes "$notes" \
-            '"Merging this pull request publishes qc2 \($version).\n\nAfter CI passes on main, the release prepare workflow tags `v\($version)` and the release workflow uploads the binaries. These changelog notes become the GitHub release body.\n\n\($notes)"')"
+          extra=""
+          if [ -z "${RELEASE_TOKEN:-}" ]; then
+            extra="CI on this pull request waits until a maintainer approves the workflows."
+          fi
+          body="$(jq -nr --arg version "$version" --arg notes "$notes" --arg extra "$extra" \
+            '"Merging this pull request publishes qc2 \($version).\n\nAfter CI passes on main, the release prepare workflow tags `v\($version)` and the release workflow uploads the binaries. These changelog notes become the GitHub release body.\n\n\($notes)\(if $extra == "" then "" else "\n\n\($extra)" end)"')"
           existing="$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --head "$branch" --json number --jq '.[0].number')"
           if [ -n "$existing" ]; then
             gh pr edit "$existing" --repo "$GITHUB_REPOSITORY" --title "chore(release): v${version}" --body "$body"

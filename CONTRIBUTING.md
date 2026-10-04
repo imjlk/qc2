@@ -56,3 +56,5 @@ Describe the change for users.
 The bump is `patch`, `minor`, or `major`. The tag in parentheses is `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, or `Security`. Leave the tag off only when the same sentence is already under `Unreleased`.
 
 After the pull request merges and CI passes, the release prepare workflow opens a release pull request. Merging that pull request tags `vX.Y.Z`. The release workflow then publishes the archives and uses that changelog section as the GitHub release notes.
+
+GitHub does not start CI on a pull request opened with the default `GITHUB_TOKEN` until a maintainer approves the workflows. To skip that prompt, add a repository secret named `RELEASE_TOKEN`: a fine-grained personal access token or GitHub App installation token that can write contents, pull requests, and Actions. The workflow then pushes the release branch, opens the pull request, and pushes the tag as that token. Without the secret, the default token still opens the pull request.
