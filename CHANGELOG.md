@@ -6,6 +6,10 @@ The project follows [Semantic Versioning](https://semver.org/). Until `v1.0.0`, 
 
 ## [Unreleased]
 
+### Fixed
+
+- Copy non-ASCII text on Windows through the Unicode clipboard instead of `clip.exe`.
+
 ## [0.1.1] - 2026-07-19
 
 ### Fixed
