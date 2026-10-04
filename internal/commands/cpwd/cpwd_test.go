@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/imjlk/qc2/internal/pathutil"
@@ -199,5 +200,46 @@ func TestExecuteShortFlags(t *testing.T) {
 
 	if stdout.String() != want+"\n" {
 		t.Fatalf("stdout = %q, want %q", stdout.String(), want+"\n")
+	}
+}
+
+func TestExecuteRejectsUnknownFlag(t *testing.T) {
+	t.Parallel()
+
+	err := Execute(context.Background(), []string{"--missing"}, Dependencies{})
+	if err == nil || err.Error() != "unknown flag: -missing" {
+		t.Fatalf("Execute() error = %v, want unknown flag: -missing", err)
+	}
+}
+
+func TestExecuteRejectsUnexpectedArguments(t *testing.T) {
+	t.Parallel()
+
+	err := Execute(context.Background(), []string{"extra"}, Dependencies{})
+	if err == nil || !strings.Contains(err.Error(), "unexpected arguments: extra") {
+		t.Fatalf("Execute() error = %v, want unexpected arguments", err)
+	}
+}
+
+func TestExecutePrintAndQuietPrintsWithoutCopying(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	clipboard := &fakeClipboard{}
+	err := Execute(context.Background(), []string{"-p", "-q"}, Dependencies{
+		Stdout:    &stdout,
+		Clipboard: clipboard,
+		WorkingDir: func() (string, error) {
+			return "/tmp/qc2", nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if len(clipboard.values) != 0 {
+		t.Fatalf("clipboard values = %#v, want no clipboard writes", clipboard.values)
+	}
+	if stdout.String() != "/tmp/qc2\n" {
+		t.Fatalf("stdout = %q, want the path", stdout.String())
 	}
 }
