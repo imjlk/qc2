@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
-	"runtime"
 	"strings"
 )
 
@@ -47,21 +46,21 @@ type backend struct {
 }
 
 func (c SystemClipboard) Copy(ctx context.Context, text string) error {
-	lookupPath := c.LookupPath
-	if lookupPath == nil {
-		lookupPath = exec.LookPath
+	if err := ctx.Err(); err != nil {
+		return err
 	}
+	return c.copy(ctx, text)
+}
 
-	commandContext := c.CommandContext
-	if commandContext == nil {
-		commandContext = exec.CommandContext
-	}
-
-	selected, err := resolveBackend(runtime.GOOS, lookupPath)
+func copyExec(ctx context.Context, goos string, text string, lookupPath func(string) (string, error), commandContext func(context.Context, string, ...string) *exec.Cmd) error {
+	selected, err := resolveBackend(goos, lookupPath)
 	if err != nil {
 		return err
 	}
+	return runClipboardCommand(ctx, commandContext, selected, text)
+}
 
+func runClipboardCommand(ctx context.Context, commandContext func(context.Context, string, ...string) *exec.Cmd, selected backend, text string) error {
 	cmd := commandContext(ctx, selected.name, selected.args...)
 	cmd.Stdin = strings.NewReader(text)
 
@@ -105,10 +104,6 @@ func backendsFor(goos string) []backend {
 	case "darwin":
 		return []backend{
 			{name: "pbcopy"},
-		}
-	case "windows":
-		return []backend{
-			{name: "clip"},
 		}
 	case "linux":
 		return []backend{
