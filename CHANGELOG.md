@@ -6,6 +6,8 @@ The project follows [Semantic Versioning](https://semver.org/). Until `v1.0.0`, 
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-04
+
 ### Changed
 
 - `qc2 version` prints the commit and build time for release binaries.
@@ -31,6 +33,7 @@ The project follows [Semantic Versioning](https://semver.org/). Until `v1.0.0`, 
 - Prebuilt release workflow with SHA-256 checksums.
 - Installation scripts that verify downloaded release archives.
 
-[Unreleased]: https://github.com/imjlk/qc2/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/imjlk/qc2/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/imjlk/qc2/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/imjlk/qc2/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/imjlk/qc2/releases/tag/v0.1.0
