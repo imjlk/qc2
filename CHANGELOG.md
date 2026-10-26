@@ -6,6 +6,12 @@ The project follows [Semantic Versioning](https://semver.org/). Until `v1.0.0`, 
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-10-26
+
+### Fixed
+
+- Install macOS and Linux binaries into a directory already on PATH so commands work immediately without sourcing shell startup files or restarting the terminal. Use sudo for /usr/local/bin when administrator access is needed, and keep custom install destinations supported.
+
 ## [0.1.2] - 2026-10-04
 
 ### Changed
@@ -33,7 +39,8 @@ The project follows [Semantic Versioning](https://semver.org/). Until `v1.0.0`, 
 - Prebuilt release workflow with SHA-256 checksums.
 - Installation scripts that verify downloaded release archives.
 
-[Unreleased]: https://github.com/imjlk/qc2/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/imjlk/qc2/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/imjlk/qc2/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/imjlk/qc2/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/imjlk/qc2/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/imjlk/qc2/releases/tag/v0.1.0
