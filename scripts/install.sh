@@ -2,7 +2,8 @@
 set -eu
 
 REPO="${QC2_REPO:-imjlk/qc2}"
-INSTALL_DIR="${QC2_INSTALL_DIR:-$HOME/.local/bin}"
+INSTALL_DIR="${QC2_INSTALL_DIR:-}"
+INSTALL_WITH_SUDO=0
 BINARIES="${QC2_BINARIES:-qc2}"
 VERSION="${QC2_VERSION:-latest}"
 
@@ -19,6 +20,81 @@ require_hash_cmd() {
 		echo "missing required command: sha256sum or shasum" >&2
 		exit 1
 	fi
+}
+
+path_contains() (
+	# Split PATH without word splitting or glob expansion (paths can contain spaces).
+	remaining_path="${PATH:-}"
+	while :; do
+		path_entry="${remaining_path%%:*}"
+		if [ -n "$path_entry" ] && [ "${path_entry%/}" = "${1%/}" ]; then
+			return 0
+		fi
+		case "$remaining_path" in
+			*:*) remaining_path="${remaining_path#*:}" ;;
+			*) return 1 ;;
+		esac
+	done
+)
+
+can_install_to() (
+	# A directory on PATH need not exist yet. Find its nearest existing parent.
+	writable_dir="$1"
+	while [ ! -e "$writable_dir" ]; do
+		writable_dir="${writable_dir%/*}"
+		[ -n "$writable_dir" ] || writable_dir=/
+	done
+	[ -d "$writable_dir" ] && [ -w "$writable_dir" ] && [ -x "$writable_dir" ]
+)
+
+select_install_dir() {
+	if [ -n "$INSTALL_DIR" ]; then
+		case "$INSTALL_DIR" in
+			/*) printf '%s\n' "$INSTALL_DIR" ;;
+			*) echo "QC2_INSTALL_DIR must be an absolute path" >&2; return 1 ;;
+		esac
+		return
+	fi
+
+	# Use conventional bin directories, never a toolchain's bin or shim directory.
+	for candidate in "$HOME/.local/bin" "$HOME/bin" /usr/local/bin /opt/homebrew/bin /home/linuxbrew/.linuxbrew/bin; do
+		if path_contains "$candidate" && can_install_to "$candidate"; then
+			printf '%s\n' "$candidate"
+			return
+		fi
+	done
+
+	# On a clean macOS/Linux setup, this usually requires administrator access.
+	if path_contains /usr/local/bin; then
+		printf '%s\n' /usr/local/bin
+		return
+	fi
+
+	echo "no suitable installation directory is on PATH" >&2
+	echo "set QC2_INSTALL_DIR to an absolute bin directory already on PATH" >&2
+	return 1
+}
+
+install_command() {
+	if [ "$INSTALL_WITH_SUDO" = 1 ]; then
+		# curl | sh owns stdin; read any sudo password from the terminal instead.
+		sudo "$@" </dev/tty
+	else
+		"$@"
+	fi
+}
+
+prepare_install_dir() {
+	if ! can_install_to "$INSTALL_DIR"; then
+		if ! command -v sudo >/dev/null 2>&1 || ! ( : </dev/tty ) 2>/dev/null; then
+			echo "cannot write to $INSTALL_DIR; sudo and an interactive terminal are required" >&2
+			echo "or set QC2_INSTALL_DIR to a writable bin directory already on PATH" >&2
+			exit 1
+		fi
+		echo "installing to $INSTALL_DIR requires administrator access (sudo)" >&2
+		INSTALL_WITH_SUDO=1
+	fi
+	install_command mkdir -p "$INSTALL_DIR"
 }
 
 os_from_uname() {
@@ -119,7 +195,7 @@ download_binary() {
 	fi
 	verify_archive "$tmpdir/$archive_name" "$archive_name" "$checksums_path"
 	tar -xzf "$tmpdir/$archive_name" -C "$tmpdir"
-	install -m 0755 "$tmpdir/${name}_${version_value}_${os_name}_${arch_name}/$name" "$INSTALL_DIR/$name"
+	install_command install -m 0755 "$tmpdir/${name}_${version_value}_${os_name}_${arch_name}/$name" "$INSTALL_DIR/$name"
 }
 
 main() {
@@ -130,6 +206,7 @@ main() {
 	require_cmd tar
 	require_hash_cmd
 
+	INSTALL_DIR="$(select_install_dir)"
 	OS_NAME="$(detect_os)"
 	ARCH_NAME="$(detect_arch)"
 	TAG="$(resolve_tag)"
@@ -139,7 +216,6 @@ main() {
 		exit 1
 	fi
 
-	mkdir -p "$INSTALL_DIR"
 	TMPDIR="$(mktemp -d)"
 	trap 'rm -rf "$TMPDIR"' EXIT INT TERM
 
@@ -150,15 +226,20 @@ main() {
 		exit 1
 	fi
 
+	prepare_install_dir
 	for name in $BINARIES; do
 		download_binary "$name" "$TAG" "$OS_NAME" "$ARCH_NAME" "$TMPDIR" "$CHECKSUMS_PATH"
 	done
 
 	echo "installed to $INSTALL_DIR"
-	case ":$PATH:" in
-		*":$INSTALL_DIR:"*) ;;
-		*) echo "add $INSTALL_DIR to PATH to run the installed commands" ;;
-	esac
+	if path_contains "$INSTALL_DIR"; then
+		for name in $BINARIES; do
+			printf 'ready to run: %s --help\n' "$name"
+		done
+	else
+		echo "warning: $INSTALL_DIR is not on PATH; run the binaries by their full path" >&2
+		echo "to use bare commands immediately, reinstall with QC2_INSTALL_DIR set to a directory already on PATH" >&2
+	fi
 }
 
 if [ "${QC2_INSTALL_SOURCE_ONLY:-}" != "1" ]; then

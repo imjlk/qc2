@@ -20,6 +20,7 @@ Install the bundled `qc2` binary:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/imjlk/qc2/main/scripts/install.sh | sh
+qc2 version
 ```
 
 Install both `qc2` and standalone `cpwd`:
@@ -28,7 +29,17 @@ Install both `qc2` and standalone `cpwd`:
 curl -fsSL https://raw.githubusercontent.com/imjlk/qc2/main/scripts/install.sh | QC2_BINARIES="qc2 cpwd" sh
 ```
 
-The default installation directory is `~/.local/bin`. Override it with `QC2_INSTALL_DIR`.
+The installer chooses a writable directory already on your `PATH`, preferring `~/.local/bin`, `~/bin`, `/usr/local/bin`, and then Homebrew's bin directory. You can run `qc2` immediately in the same terminal; no `source` command or terminal restart is needed. Shell startup files are not changed.
+
+If none of those directories is writable, the installer uses `/usr/local/bin` when it is on `PATH` and asks for administrator access through `sudo`. Run it in an interactive terminal for the password prompt.
+
+Override the destination with an absolute `QC2_INSTALL_DIR`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/imjlk/qc2/main/scripts/install.sh | QC2_INSTALL_DIR=/usr/local/bin sh
+```
+
+For immediate command access, choose a directory already on `PATH`. A custom destination outside `PATH` still works through its full path, such as `~/.local/bin/qc2 version`. Sourcing `~/.zshrc` or restarting the terminal only helps if that file actually adds the destination to `PATH`.
 
 ### Windows PowerShell
 
@@ -102,8 +113,12 @@ When no Linux backend is available, use `--print` or install one of the listed t
 Remove the installed binaries from your selected install directory:
 
 ```bash
-rm -f ~/.local/bin/qc2 ~/.local/bin/cpwd
+rm -f "$(command -v qc2)"
+# If you also installed the standalone command:
+rm -f "$(command -v cpwd)"
 ```
+
+Use `sudo rm` if the installation required administrator access. For older installations outside `PATH`, remove `~/.local/bin/qc2` and `~/.local/bin/cpwd` directly.
 
 ## Development
 
